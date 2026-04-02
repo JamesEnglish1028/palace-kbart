@@ -1,4 +1,6 @@
-const identifySourceIdType = (value) => {
+import type { OpdsFeed, OpdsLink, OpdsPublication } from "../types/opds";
+
+const identifySourceIdType = (value: string) => {
   const trimmed = String(value || "").trim();
   if (!trimmed) return "";
   if (trimmed.toLowerCase().startsWith("urn:isbn:")) return "ISBN";
@@ -10,7 +12,7 @@ const identifySourceIdType = (value) => {
   return "URI";
 };
 
-const isLikelyIdentifier = (value) => {
+const isLikelyIdentifier = (value: string) => {
   const trimmed = String(value || "").trim();
   if (!trimmed) return false;
   if (trimmed.startsWith("urn:")) return true;
@@ -18,22 +20,25 @@ const isLikelyIdentifier = (value) => {
   return false;
 };
 
-const extractIdentifierValue = (identifier) => {
+const extractIdentifierValue = (identifier: unknown) => {
   if (!identifier) return "";
   if (typeof identifier === "string") return identifier;
   if (Array.isArray(identifier)) {
     const stringId = identifier.find((item) => typeof item === "string");
     if (stringId) return stringId;
-    const objectId = identifier.find((item) => item?.value || item?.identifier);
-    return objectId?.value || objectId?.identifier || "";
+    const objectId = identifier.find(
+      (item) =>
+        typeof item === "object" && (item as any)?.value && (item as any)?.identifier
+    );
+    return (objectId as any)?.value || (objectId as any)?.identifier || "";
   }
   if (typeof identifier === "object") {
-    return identifier.value || identifier.identifier || "";
+    return (identifier as any).value || (identifier as any).identifier || "";
   }
   return "";
 };
 
-const normalizeIsbn = (value) => {
+const normalizeIsbn = (value: string) => {
   const cleaned = String(value || "").replace(/[^0-9Xx]/g, "");
   if (cleaned.length === 13) return cleaned;
   if (cleaned.length !== 10) return cleaned;
@@ -48,7 +53,7 @@ const normalizeIsbn = (value) => {
   return `${prefix}${check}`;
 };
 
-const identifierForWorkUrl = (rawIdentifier) => {
+const identifierForWorkUrl = (rawIdentifier: string) => {
   const trimmed = String(rawIdentifier || "").trim();
   if (!trimmed) return null;
   const lower = trimmed.toLowerCase();
@@ -68,9 +73,9 @@ const identifierForWorkUrl = (rawIdentifier) => {
   return { type: "URI", value: trimmed };
 };
 
-const isAbsoluteUrl = (value) => /^https?:\/\//i.test(String(value || ""));
+const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(String(value || ""));
 
-const normalizeFeedUrl = (href, base) => {
+const normalizeFeedUrl = (href: string, base: string) => {
   if (!href) return "";
   if (href.startsWith(base)) return href;
   if (href.startsWith("/")) return `${base}${href}`;
@@ -85,7 +90,7 @@ const normalizeFeedUrl = (href, base) => {
   }
 };
 
-const buildFeedRequestUrl = (href, base) => {
+const buildFeedRequestUrl = (href: string, base: string) => {
   if (!href) return "";
   if (isAbsoluteUrl(base)) {
     const absolute = isAbsoluteUrl(href)
@@ -96,7 +101,7 @@ const buildFeedRequestUrl = (href, base) => {
   return normalizeFeedUrl(href, base);
 };
 
-const buildFeedDisplayUrl = (href, base) => {
+const buildFeedDisplayUrl = (href: string, base: string) => {
   if (!href) return "";
   if (href.startsWith("/opds-proxy?url=")) {
     const raw = href.split("/opds-proxy?url=")[1] || "";
@@ -112,13 +117,13 @@ const buildFeedDisplayUrl = (href, base) => {
   return normalizeFeedUrl(href, base);
 };
 
-const parseOpds2Publication = (publication) => {
+const parseOpds2Publication = (publication: OpdsPublication) => {
   const metadata = publication?.metadata || {};
   const title = metadata.title || "";
   const authors =
     Array.isArray(metadata.author) && metadata.author.length > 0
       ? metadata.author
-          .map((author) => author?.name || author)
+          .map((author) => (typeof author === "string" ? author : author?.name))
           .filter(Boolean)
           .join("; ")
       : "";
@@ -128,7 +133,9 @@ const parseOpds2Publication = (publication) => {
   const editors =
     Array.isArray(metadata.editor) && metadata.editor.length > 0
       ? metadata.editor
-          .map((editor) => editor?.name || editor)
+          .map((editor) =>
+            typeof editor === "string" ? editor : editor?.name
+          )
           .filter(Boolean)
           .join("; ")
       : "";
@@ -153,19 +160,19 @@ const parseOpds2Publication = (publication) => {
   };
 };
 
-const parseOpds2Feed = (data) => {
+const parseOpds2Feed = (data: OpdsFeed) => {
   const publications = Array.isArray(data?.publications)
     ? data.publications
     : [];
   const items = publications.map(parseOpds2Publication);
   const nextLink =
     Array.isArray(data?.links) &&
-    data.links.find((link) => (link.rel || "").includes("next"));
+    data.links.find((link: OpdsLink) => (link.rel || "").includes("next"));
   return { items, nextHref: nextLink?.href || "" };
 };
 
-const collectOpdsLinks = (data) => {
-  const links = [];
+const collectOpdsLinks = (data: OpdsFeed) => {
+  const links: OpdsLink[] = [];
   if (Array.isArray(data?.links)) {
     links.push(...data.links);
   }
@@ -199,7 +206,6 @@ export {
   buildFeedDisplayUrl,
   buildFeedRequestUrl,
   collectOpdsLinks,
-  extractIdentifierValue,
   identifySourceIdType,
   identifierForWorkUrl,
   isLikelyIdentifier,

@@ -1,4 +1,4 @@
-const normalizeRegistryLibraries = (data) => {
+const normalizeRegistryLibraries = (data: any) => {
   if (!data) return [];
   if (Array.isArray(data?.libraries)) return data.libraries;
   if (Array.isArray(data?.items)) return data.items;
@@ -8,7 +8,7 @@ const normalizeRegistryLibraries = (data) => {
   return [];
 };
 
-const extractLibraryName = (entry) =>
+const extractLibraryName = (entry: any) =>
   entry?.name ||
   entry?.title ||
   entry?.metadata?.title ||
@@ -17,7 +17,7 @@ const extractLibraryName = (entry) =>
   entry?.shortName ||
   "Library";
 
-const extractShortNameFromOpdsUrl = (value) => {
+const extractShortNameFromOpdsUrl = (value: string) => {
   if (!value) return "";
   try {
     const parsed = new URL(value);
@@ -30,18 +30,18 @@ const extractShortNameFromOpdsUrl = (value) => {
   }
 };
 
-const extractLibraryOpdsUrl = (entry) => {
+const extractLibraryOpdsUrl = (entry: any) => {
   if (!entry) return "";
   if (entry?.opds_url) return entry.opds_url;
   if (entry?.opdsUrl) return entry.opdsUrl;
   if (entry?.opds2_url) return entry.opds2_url;
   if (entry?.opds2Url) return entry.opds2Url;
   if (Array.isArray(entry?.catalogs) && entry.catalogs.length > 0) {
-    const catalog = entry.catalogs.find((item) => item?.href || item?.url);
+    const catalog = entry.catalogs.find((item: any) => item?.href || item?.url);
     return catalog?.href || catalog?.url || "";
   }
   if (Array.isArray(entry?.links) && entry.links.length > 0) {
-    const link = entry.links.find((item) =>
+    const link = entry.links.find((item: any) =>
       String(item?.type || "").includes("opds")
     );
     return link?.href || "";
@@ -49,7 +49,7 @@ const extractLibraryOpdsUrl = (entry) => {
   return "";
 };
 
-const extractLibraryShortName = (entry) => {
+const extractLibraryShortName = (entry: any) => {
   const direct =
     entry?.short_name ||
     entry?.shortName ||
@@ -62,7 +62,7 @@ const extractLibraryShortName = (entry) => {
   return extractShortNameFromOpdsUrl(opdsUrl);
 };
 
-const deriveFeedBaseFromUrl = (value) => {
+const deriveFeedBaseFromUrl = (value: string) => {
   try {
     const parsed = new URL(value);
     return parsed.origin;

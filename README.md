@@ -52,3 +52,6 @@ The app runs at `http://localhost:5173` and proxies:
 
 Title URLs are constructed using the Palace reader URL pattern from the MARC
 annotator logic.
+
+This app uses TypeScript components and a registry-sync hook to keep the UI
+maintainable and testable.
