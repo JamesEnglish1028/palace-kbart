@@ -10,10 +10,11 @@ export type OpdsMetadata = {
   title?: string;
   name?: string;
   author?: Array<{ name?: string } | string>;
+  contributor?: Array<{ name?: string } | string> | { name?: string } | string;
   editor?: Array<{ name?: string } | string>;
   identifier?: unknown;
   id?: unknown;
-  publisher?: string;
+  publisher?: string | { name?: string } | Array<{ name?: string } | string>;
   published?: string;
   published_date?: string;
 };

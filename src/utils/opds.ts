@@ -117,28 +117,61 @@ const buildFeedDisplayUrl = (href: string, base: string) => {
   return normalizeFeedUrl(href, base);
 };
 
+const normalizePersonList = (value: unknown) => {
+  if (!value) return "";
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item : item?.name))
+      .filter(Boolean)
+      .join("; ");
+  }
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    return (value as { name?: string }).name || "";
+  }
+  return "";
+};
+
+const normalizeFirstPerson = (value: unknown) => {
+  if (!value) return "";
+  if (Array.isArray(value)) {
+    const first = value.find((item) =>
+      typeof item === "string" ? item : item?.name
+    );
+    if (!first) return "";
+    return typeof first === "string" ? first : first?.name || "";
+  }
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    return (value as { name?: string }).name || "";
+  }
+  return "";
+};
+
+const normalizePublisher = (value: unknown) => {
+  if (!value) return "";
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item : item?.name))
+      .filter(Boolean)
+      .join("; ");
+  }
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    return (value as { name?: string }).name || "";
+  }
+  return "";
+};
+
 const parseOpds2Publication = (publication: OpdsPublication) => {
   const metadata = publication?.metadata || {};
   const title = metadata.title || "";
-  const authors =
-    Array.isArray(metadata.author) && metadata.author.length > 0
-      ? metadata.author
-          .map((author) => (typeof author === "string" ? author : author?.name))
-          .filter(Boolean)
-          .join("; ")
-      : "";
+  const authors = normalizeFirstPerson(metadata.author);
+  const contributors = normalizeFirstPerson(metadata.contributor);
   const identifier = extractIdentifierValue(metadata.identifier || metadata.id);
-  const publisher = metadata.publisher || "";
+  const publisher = normalizePublisher(metadata.publisher);
   const published = metadata.published || metadata.published_date || "";
-  const editors =
-    Array.isArray(metadata.editor) && metadata.editor.length > 0
-      ? metadata.editor
-          .map((editor) =>
-            typeof editor === "string" ? editor : editor?.name
-          )
-          .filter(Boolean)
-          .join("; ")
-      : "";
+  const editors = normalizePersonList(metadata.editor);
 
   let urn = identifier;
   if (!urn && publication?.links?.length) {
@@ -152,7 +185,7 @@ const parseOpds2Publication = (publication: OpdsPublication) => {
 
   return {
     title,
-    authors,
+    authors: authors || contributors || "Unlisted",
     identifier: urn,
     publisher,
     published,
