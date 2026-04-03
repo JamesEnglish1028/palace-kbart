@@ -1,8 +1,8 @@
 # Palace KBART Exporter
 
 A lightweight React app for exporting KBART-formatted title lists from Palace
-Manager collections. It signs in with an admin account, lets you pick a
-library + collection, and downloads a KBART CSV with Palace reader URLs.
+Manager collections. It uses the public OPDS feeds to locate libraries and
+collections, then downloads a KBART CSV with Palace reader URLs.
 
 **Quick Start**
 1. Install dependencies:
