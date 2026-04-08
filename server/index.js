@@ -78,6 +78,7 @@ app.get("/opds-proxy", async (req, res) => {
     }
     res.end(buffer);
   } catch (error) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.status(502).send(String(error));
   }
 });
@@ -118,6 +119,7 @@ app.get("/web-proxy", async (req, res) => {
     }
     res.end(buffer);
   } catch (error) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.status(502).send(String(error));
   }
 });
@@ -158,6 +160,7 @@ app.get("/registry-proxy", async (req, res) => {
     }
     res.end(buffer);
   } catch (error) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
     res.status(502).send(String(error));
   }
 });

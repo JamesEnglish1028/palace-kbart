@@ -129,7 +129,10 @@ const fetchLocIsbn = async (
   const year = yearMatch ? yearMatch[0] : "";
   const queryParts = [title, author, year].filter(Boolean);
   if (queryParts.length === 0) return "";
-  const query = queryParts.join(" ");
+  let query = queryParts.join(" ");
+  if (query.length > 200) {
+    query = query.slice(0, 200);
+  }
   const params = new URLSearchParams({
     q: query,
     fo: "json",
