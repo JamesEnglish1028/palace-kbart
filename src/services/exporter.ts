@@ -72,7 +72,13 @@ const LOC_PROXY_BASE =
   (import.meta as ImportMeta).env?.VITE_OPDS_PROXY_BASE ||
   "";
 
-const buildLocProxyUrl = () => LOC_PROXY_BASE;
+const buildLocIsbnUrl = () => {
+  if (!LOC_PROXY_BASE) return "";
+  if (LOC_PROXY_BASE.endsWith("/loc-proxy")) {
+    return LOC_PROXY_BASE.replace(/\/loc-proxy$/, "/loc-isbn");
+  }
+  return LOC_PROXY_BASE;
+};
 
 const normalizeIsbnValue = (value: string) => {
   const cleaned = String(value || "").replace(/[^0-9Xx]/g, "");
@@ -119,7 +125,8 @@ const fetchLocIsbn = async (
   author: string,
   published: string
 ) => {
-  if (!LOC_PROXY_BASE) return "";
+  const proxyUrl = buildLocIsbnUrl();
+  if (!proxyUrl) return "";
   const yearMatch = published?.match(/\b(19|20)\d{2}\b/);
   const year = yearMatch ? yearMatch[0] : "";
   const queryParts = [title, author, year].filter(Boolean);
@@ -137,34 +144,18 @@ const fetchLocIsbn = async (
     fa: "original-format:book",
   });
   const searchUrl = `https://www.loc.gov/search/?${params.toString()}`;
-  const proxyUrl = buildLocProxyUrl();
-  const response = await fetch(proxyUrl || searchUrl, {
-    method: proxyUrl ? "POST" : "GET",
+  const requestUrl = `${proxyUrl}?title=${encodeURIComponent(
+    title
+  )}&author=${encodeURIComponent(author)}&year=${encodeURIComponent(year)}`;
+  const finalResponse = await fetch(requestUrl, {
+    method: "GET",
     headers: {
       Accept: "application/json",
-      "Content-Type": "application/json",
     },
-    body: proxyUrl ? JSON.stringify({ url: searchUrl }) : undefined,
   });
-  if (!response.ok) return "";
-  const data = (await response.json()) as { results?: Array<{ id?: string }> };
-  const first = data?.results?.find((item) => item?.id);
-  if (!first?.id) return "";
-  const itemUrl = first.id.includes("?")
-    ? `${first.id}&fo=json&at=item`
-    : `${first.id}?fo=json&at=item`;
-  const itemResponse = await fetch(proxyUrl || itemUrl, {
-    method: proxyUrl ? "POST" : "GET",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: proxyUrl ? JSON.stringify({ url: itemUrl }) : undefined,
-  });
-  if (!itemResponse.ok) return "";
-  const itemData = await itemResponse.json();
-  const candidates = extractIsbnFromObject(itemData);
-  return candidates[0] || "";
+  if (!finalResponse.ok) return "";
+  const payload = (await finalResponse.json()) as { isbn?: string };
+  return payload?.isbn || "";
 };
 
 const shouldContinueCrawl = (
