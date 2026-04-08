@@ -138,12 +138,6 @@ const fetchLocIsbn = async (
   if (query.length > 200) {
     query = query.slice(0, 200);
   }
-  const params = new URLSearchParams({
-    q: query,
-    fo: "json",
-    fa: "original-format:book",
-  });
-  const searchUrl = `https://www.loc.gov/search/?${params.toString()}`;
   const requestUrl = `${proxyUrl}?title=${encodeURIComponent(
     title
   )}&author=${encodeURIComponent(author)}&year=${encodeURIComponent(year)}`;

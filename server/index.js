@@ -276,9 +276,8 @@ app.get("/loc-isbn", async (req, res) => {
   const params = new URLSearchParams({
     q: query,
     fo: "json",
-    fa: "original-format:book",
   });
-  const searchUrl = `https://www.loc.gov/search/?${params.toString()}`;
+  const searchUrl = `https://www.loc.gov/books/?${params.toString()}`;
   try {
     const searchResponse = await fetchWithRedirects(
       searchUrl,
@@ -294,6 +293,11 @@ app.get("/loc-isbn", async (req, res) => {
     if (!searchResponse.ok) {
       res.setHeader("content-type", "text/plain; charset=utf-8");
       res.end(buffer);
+      return;
+    }
+    const contentType = searchResponse.headers.get("content-type") || "";
+    if (!contentType.includes("json")) {
+      res.json({ isbn: "" });
       return;
     }
     const data = JSON.parse(buffer.toString("utf8"));
