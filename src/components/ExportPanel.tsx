@@ -17,6 +17,8 @@ type ExportPanelProps = {
   exportMessage: string;
   exportPagesFetched: number;
   exportFeedUrl: string;
+  enrichIsbn: boolean;
+  setEnrichIsbn: (value: boolean) => void;
   marcCount: number;
   marcFromDate: string;
   setMarcFromDate: (value: string) => void;
@@ -46,6 +48,8 @@ function ExportPanel({
   exportMessage,
   exportPagesFetched,
   exportFeedUrl,
+  enrichIsbn,
+  setEnrichIsbn,
   marcCount,
   marcFromDate,
   setMarcFromDate,
@@ -175,6 +179,17 @@ function ExportPanel({
                 value={fromDate}
                 onChange={(event) => setFromDate(event.target.value)}
               />
+            </label>
+            <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 text-emerald-600"
+                checked={enrichIsbn}
+                onChange={(event) => setEnrichIsbn(event.target.checked)}
+              />
+              <span>
+                Enrich missing ISBNs using Library of Congress (slower).
+              </span>
             </label>
             <button
               type="button"

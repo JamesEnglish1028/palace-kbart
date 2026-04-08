@@ -60,6 +60,7 @@ function App() {
   const [exportCount, setExportCount] = useState(0);
   const [exportPagesFetched, setExportPagesFetched] = useState(0);
   const [exportFeedUrl, setExportFeedUrl] = useState("");
+  const [enrichIsbn, setEnrichIsbn] = useState(false);
   const [marcFormat, setMarcFormat] = useState<"marc21" | "marcxml">("marc21");
   const [marcFromDate, setMarcFromDate] = useState("");
   const [marcStatus, setMarcStatus] = useState<Status>(STATUS_IDLE);
@@ -281,6 +282,7 @@ function App() {
         baseUrl,
         webClientUrl,
         fromDate,
+        enrichIsbn,
         onProgress: (pages) => setExportPagesFetched(pages),
       });
       setExportFeedUrl(displayUrl);
@@ -531,6 +533,8 @@ function App() {
             exportMessage={exportMessage}
             exportPagesFetched={exportPagesFetched}
             exportFeedUrl={exportFeedUrl}
+            enrichIsbn={enrichIsbn}
+            setEnrichIsbn={setEnrichIsbn}
             marcCount={marcCount}
             marcFromDate={marcFromDate}
             setMarcFromDate={setMarcFromDate}

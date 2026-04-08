@@ -24,6 +24,7 @@ const DEFAULT_KBART_HEADERS = [
   "title_url",
   "first_author",
   "online_identifier",
+  "isbn",
   "publisher_name",
   "publication_type",
   "date_monograph_published_online",
@@ -64,6 +65,100 @@ const extractProviderId = (identifier: string, sourceIdType: string) => {
     }
   }
   return "";
+};
+
+const LOC_PROXY_BASE =
+  (import.meta as ImportMeta).env?.VITE_LOC_PROXY_BASE ||
+  (import.meta as ImportMeta).env?.VITE_OPDS_PROXY_BASE ||
+  "";
+
+const buildLocProxyUrl = (url: string) => {
+  if (!url) return url;
+  if (!LOC_PROXY_BASE) return url;
+  const joiner = LOC_PROXY_BASE.includes("?") ? "&" : "?";
+  return `${LOC_PROXY_BASE}${joiner}url=${encodeURIComponent(url)}`;
+};
+
+const normalizeIsbnValue = (value: string) => {
+  const cleaned = String(value || "").replace(/[^0-9Xx]/g, "");
+  if (!cleaned) return "";
+  if (cleaned.length === 13) return cleaned;
+  if (cleaned.length !== 10) return "";
+  const body = cleaned.slice(0, 9);
+  const prefix = `978${body}`;
+  let sum = 0;
+  for (let index = 0; index < prefix.length; index += 1) {
+    const digit = Number(prefix[index]);
+    sum += digit * (index % 2 === 0 ? 1 : 3);
+  }
+  const check = (10 - (sum % 10)) % 10;
+  return `${prefix}${check}`;
+};
+
+const extractIsbnFromObject = (value: unknown): string[] => {
+  if (!value) return [];
+  if (typeof value === "string") {
+    const normalized = normalizeIsbnValue(value);
+    return normalized ? [normalized] : [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => extractIsbnFromObject(item));
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const matches: string[] = [];
+    Object.entries(obj).forEach(([key, val]) => {
+      if (key.toLowerCase().includes("isbn")) {
+        matches.push(...extractIsbnFromObject(val));
+      } else if (typeof val === "object") {
+        matches.push(...extractIsbnFromObject(val));
+      }
+    });
+    return matches;
+  }
+  return [];
+};
+
+const fetchLocIsbn = async (
+  title: string,
+  author: string,
+  published: string
+) => {
+  if (!LOC_PROXY_BASE) return "";
+  const yearMatch = published?.match(/\b(19|20)\d{2}\b/);
+  const year = yearMatch ? yearMatch[0] : "";
+  const queryParts = [title, author, year].filter(Boolean);
+  if (queryParts.length === 0) return "";
+  const query = queryParts.join(" ");
+  const params = new URLSearchParams({
+    q: query,
+    fo: "json",
+    fa: "original-format:book",
+  });
+  const searchUrl = `https://www.loc.gov/search/?${params.toString()}`;
+  const response = await fetch(buildLocProxyUrl(searchUrl), {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+  if (!response.ok) return "";
+  const data = (await response.json()) as { results?: Array<{ id?: string }> };
+  const first = data?.results?.find((item) => item?.id);
+  if (!first?.id) return "";
+  const itemUrl = first.id.includes("?")
+    ? `${first.id}&fo=json&at=item`
+    : `${first.id}?fo=json&at=item`;
+  const itemResponse = await fetch(buildLocProxyUrl(itemUrl), {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+  if (!itemResponse.ok) return "";
+  const itemData = await itemResponse.json();
+  const candidates = extractIsbnFromObject(itemData);
+  return candidates[0] || "";
 };
 
 const shouldContinueCrawl = (
@@ -145,7 +240,8 @@ const exportKbart = async ({
   webClientUrl,
   fromDate,
   onProgress,
-}: ExportOptions) => {
+  enrichIsbn,
+}: ExportOptions & { enrichIsbn?: boolean }) => {
   const collectionFeedUrl = buildFeedRequestUrl(collectionHref, feedBase);
   const displayUrl = buildFeedDisplayUrl(collectionHref, feedBase);
   const parsedFromDate = fromDate ? Date.parse(fromDate) : NaN;
@@ -158,45 +254,67 @@ const exportKbart = async ({
     fromDateValue,
     onProgress
   );
-  const rows = entries
-    .filter((entry) => isLikelyIdentifier(entry.identifier))
-    .filter((entry) => {
-      if (!fromDateValue) return true;
-      const modified = entry.modified ? Date.parse(entry.modified) : NaN;
-      return Number.isFinite(modified) && modified >= fromDateValue;
-    })
-    .map((entry) => {
-      const identifier = entry.identifier;
-      const workIdentifier = identifierForWorkUrl(identifier);
-      if (!workIdentifier) return null;
-      const qualifiedIdentifier = encodeURIComponent(
-        `${workIdentifier.type}/${workIdentifier.value}`
-      );
-      const worksUrl = `${baseUrl}/${libraryShortName}/works/${qualifiedIdentifier}`;
-      const encodedLink = encodeURIComponent(worksUrl);
-      const titleUrl = `${webClientUrl}/book/${encodedLink}`;
+  const isbnCache = new Map<string, string>();
+  const rows = await Promise.all(
+    entries
+      .filter((entry) => isLikelyIdentifier(entry.identifier))
+      .filter((entry) => {
+        if (!fromDateValue) return true;
+        const modified = entry.modified ? Date.parse(entry.modified) : NaN;
+        return Number.isFinite(modified) && modified >= fromDateValue;
+      })
+      .map(async (entry) => {
+        const identifier = entry.identifier;
+        const workIdentifier = identifierForWorkUrl(identifier);
+        if (!workIdentifier) return null;
+        const qualifiedIdentifier = encodeURIComponent(
+          `${workIdentifier.type}/${workIdentifier.value}`
+        );
+        const worksUrl = `${baseUrl}/${libraryShortName}/works/${qualifiedIdentifier}`;
+        const encodedLink = encodeURIComponent(worksUrl);
+        const titleUrl = `${webClientUrl}/book/${encodedLink}`;
+        let isbnValue = "";
+        if (identifySourceIdType(identifier) === "ISBN") {
+          isbnValue = normalizeIsbnValue(identifier) || identifier;
+        } else if (enrichIsbn) {
+          const cacheKey = `${entry.title}|${entry.authors}|${entry.published}`;
+          if (isbnCache.has(cacheKey)) {
+            isbnValue = isbnCache.get(cacheKey) || "";
+          } else {
+            const lookedUp = await fetchLocIsbn(
+              entry.title,
+              entry.authors,
+              entry.published
+            );
+            isbnCache.set(cacheKey, lookedUp);
+            isbnValue = lookedUp;
+          }
+        }
 
-      return [
-        identifier,
-        entry.title,
-        titleUrl,
-        entry.authors,
-        identifier,
-        entry.publisher,
-        "monograph",
-        entry.published,
-        entry.editors,
-        "P",
-        collectionName,
-        identifySourceIdType(identifier),
-        extractProviderId(identifier, identifySourceIdType(identifier)),
-      ];
-    })
-    .filter(Boolean) as string[][];
+        return [
+          identifier,
+          entry.title,
+          titleUrl,
+          entry.authors,
+          identifier,
+          isbnValue,
+          entry.publisher,
+          "monograph",
+          entry.published,
+          entry.editors,
+          "P",
+          collectionName,
+          identifySourceIdType(identifier),
+          extractProviderId(identifier, identifySourceIdType(identifier)),
+        ];
+      })
+  );
+
+  const rowsFiltered = rows.filter(Boolean) as string[][];
 
   return {
-    csv: buildKbartCsv(rows),
-    rowsCount: rows.length,
+    csv: buildKbartCsv(rowsFiltered),
+    rowsCount: rowsFiltered.length,
     displayUrl,
   };
 };

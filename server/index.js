@@ -162,6 +162,46 @@ app.get("/registry-proxy", async (req, res) => {
   }
 });
 
+app.get("/loc-proxy", async (req, res) => {
+  const target = req.query.url;
+  if (!target || typeof target !== "string") {
+    res.status(400).send("Missing url parameter");
+    return;
+  }
+  try {
+    const response = await fetchWithRedirects(
+      target,
+      {
+        Accept: "application/json",
+        "Accept-Encoding": "identity",
+        "User-Agent": "curl/8.4.0",
+      },
+      0
+    );
+    res.status(response.status);
+    response.headers.forEach((value, key) => {
+      const lower = key.toLowerCase();
+      if (lower === "content-encoding" || lower === "access-control-allow-origin")
+        return;
+      res.setHeader(key, value);
+    });
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!response.ok) {
+      const location = response.headers.get("location");
+      const snippet = buffer.toString("utf8").slice(0, 500);
+      res.setHeader("content-type", "text/plain; charset=utf-8");
+      res.end(
+        `Upstream status: ${response.status}\nLocation: ${location || ""}\nBody:\n${snippet}`
+      );
+      return;
+    }
+    res.end(buffer);
+  } catch (error) {
+    res.status(502).send(String(error));
+  }
+});
+
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`Proxy listening on ${PORT}`);
