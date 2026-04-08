@@ -43,6 +43,8 @@ The app runs at `http://localhost:5173`.
   running on static hosting (e.g., `https://your-proxy.example.com/registry-proxy`).
 - `VITE_LOC_PROXY_BASE` (optional): Proxy endpoint for Library of Congress lookups
   (e.g., `https://your-proxy.example.com/loc-proxy`).
+- `VITE_OL_PROXY_BASE` (optional): Proxy endpoint for Open Library lookups
+  (e.g., `https://your-proxy.example.com/ol-proxy`).
 
 **KBART Columns**
 - `title_id`
@@ -82,4 +84,5 @@ at the proxy service URL, for example:
 - `VITE_WEB_PROXY_BASE=https://palace-kbart-proxy.onrender.com/web-proxy`
 - `VITE_REGISTRY_PROXY_BASE=https://palace-kbart-proxy.onrender.com/registry-proxy`
 - `VITE_LOC_PROXY_BASE=https://palace-kbart-proxy.onrender.com/loc-proxy`
+- `VITE_OL_PROXY_BASE=https://palace-kbart-proxy.onrender.com/ol-proxy`
 - `VITE_LOC_PROXY_BASE=https://palace-kbart-proxy.onrender.com/loc-proxy`

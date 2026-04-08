@@ -19,6 +19,8 @@ type ExportPanelProps = {
   exportFeedUrl: string;
   enrichIsbn: boolean;
   setEnrichIsbn: (value: boolean) => void;
+  isbnSource: "openlibrary" | "loc";
+  setIsbnSource: (value: "openlibrary" | "loc") => void;
   locEstimate: string;
   marcCount: number;
   marcFromDate: string;
@@ -51,6 +53,8 @@ function ExportPanel({
   exportFeedUrl,
   enrichIsbn,
   setEnrichIsbn,
+  isbnSource,
+  setIsbnSource,
   locEstimate,
   marcCount,
   marcFromDate,
@@ -189,10 +193,23 @@ function ExportPanel({
                 checked={enrichIsbn}
                 onChange={(event) => setEnrichIsbn(event.target.checked)}
               />
-              <span>
-                Enrich missing ISBNs using Library of Congress (slower).
-              </span>
+              <span>Enrich missing ISBNs (slower).</span>
             </label>
+            {enrichIsbn && (
+              <label className="grid gap-2 text-sm font-medium text-slate-700">
+                ISBN source
+                <select
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm"
+                  value={isbnSource}
+                  onChange={(event) =>
+                    setIsbnSource(event.target.value as "openlibrary" | "loc")
+                  }
+                >
+                  <option value="openlibrary">Open Library (recommended)</option>
+                  <option value="loc">Library of Congress (slow)</option>
+                </select>
+              </label>
+            )}
             {locEstimate && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
                 {locEstimate}

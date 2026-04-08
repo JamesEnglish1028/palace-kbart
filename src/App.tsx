@@ -61,6 +61,9 @@ function App() {
   const [exportPagesFetched, setExportPagesFetched] = useState(0);
   const [exportFeedUrl, setExportFeedUrl] = useState("");
   const [enrichIsbn, setEnrichIsbn] = useState(false);
+  const [isbnSource, setIsbnSource] = useState<"openlibrary" | "loc">(
+    "openlibrary"
+  );
   const [locEstimate, setLocEstimate] = useState("");
   const [marcFormat, setMarcFormat] = useState<"marc21" | "marcxml">("marc21");
   const [marcFromDate, setMarcFromDate] = useState("");
@@ -285,6 +288,7 @@ function App() {
         webClientUrl,
         fromDate,
         enrichIsbn,
+        isbnSource,
         onProgress: (pages) => setExportPagesFetched(pages),
         onLocEstimate: (count, seconds) => {
           if (!enrichIsbn || count === 0) return;
@@ -292,7 +296,9 @@ function App() {
           setLocEstimate(
             `ISBN enrichment may take ~${minutes} minute${
               minutes === 1 ? "" : "s"
-            } for ${count} lookups at 20/minute.`
+            } for ${count} lookups at ${
+              isbnSource === "loc" ? "20" : "60"
+            }/minute.`
           );
         },
       });
@@ -546,6 +552,8 @@ function App() {
             exportFeedUrl={exportFeedUrl}
             enrichIsbn={enrichIsbn}
             setEnrichIsbn={setEnrichIsbn}
+            isbnSource={isbnSource}
+            setIsbnSource={setIsbnSource}
             locEstimate={locEstimate}
             marcCount={marcCount}
             marcFromDate={marcFromDate}

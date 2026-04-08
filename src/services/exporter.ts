@@ -72,6 +72,10 @@ const LOC_PROXY_BASE =
   (import.meta as ImportMeta).env?.VITE_LOC_PROXY_BASE ||
   (import.meta as ImportMeta).env?.VITE_OPDS_PROXY_BASE ||
   "";
+const OL_PROXY_BASE =
+  (import.meta as ImportMeta).env?.VITE_OL_PROXY_BASE ||
+  (import.meta as ImportMeta).env?.VITE_OPDS_PROXY_BASE ||
+  "";
 
 const buildLocIsbnUrl = () => {
   if (!LOC_PROXY_BASE) return "";
@@ -81,8 +85,16 @@ const buildLocIsbnUrl = () => {
   return LOC_PROXY_BASE;
 };
 
+const buildOlIsbnUrl = () => {
+  if (!OL_PROXY_BASE) return "";
+  if (OL_PROXY_BASE.endsWith("/ol-proxy")) {
+    return OL_PROXY_BASE.replace(/\/ol-proxy$/, "/ol-isbn");
+  }
+  return OL_PROXY_BASE;
+};
+
 const locState = {
-  delayMs: 500,
+  delayMs: 5000,
   lastRequest: 0,
 };
 
@@ -188,6 +200,29 @@ const fetchLocIsbn = async (
   });
 };
 
+const fetchOpenLibraryIsbn = async (
+  title: string,
+  author: string,
+  published: string
+) => {
+  const proxyUrl = buildOlIsbnUrl();
+  if (!proxyUrl) return "";
+  const yearMatch = published?.match(/\b(19|20)\d{2}\b/);
+  const year = yearMatch ? yearMatch[0] : "";
+  const requestUrl = `${proxyUrl}?title=${encodeURIComponent(
+    title
+  )}&author=${encodeURIComponent(author)}&year=${encodeURIComponent(year)}`;
+  const response = await fetch(requestUrl, {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+  if (!response.ok) return "";
+  const payload = (await response.json()) as { isbn?: string };
+  return payload?.isbn || "";
+};
+
 const shouldContinueCrawl = (
   entries: ReturnType<typeof parseOpds2Feed>["items"],
   fromDateValue: number | null
@@ -269,7 +304,11 @@ const exportKbart = async ({
   onProgress,
   enrichIsbn,
   onLocEstimate,
-}: ExportOptions & { enrichIsbn?: boolean }) => {
+  isbnSource,
+}: ExportOptions & {
+  enrichIsbn?: boolean;
+  isbnSource?: "openlibrary" | "loc";
+}) => {
   const collectionFeedUrl = buildFeedRequestUrl(collectionHref, feedBase);
   const displayUrl = buildFeedDisplayUrl(collectionHref, feedBase);
   const parsedFromDate = fromDate ? Date.parse(fromDate) : NaN;
@@ -295,7 +334,10 @@ const exportKbart = async ({
     const lookupCount = filteredEntries.filter(
       (entry) => identifySourceIdType(entry.identifier) !== "ISBN"
     ).length;
-    const seconds = Math.ceil((lookupCount / 20) * 60);
+    const seconds =
+      isbnSource === "loc"
+        ? Math.ceil((lookupCount / 20) * 60)
+        : Math.ceil((lookupCount / 60) * 60);
     onLocEstimate(lookupCount, seconds);
   }
 
@@ -318,11 +360,18 @@ const exportKbart = async ({
           if (isbnCache.has(cacheKey)) {
             isbnValue = isbnCache.get(cacheKey) || "";
           } else {
-            const lookedUp = await fetchLocIsbn(
-              entry.title,
-              entry.authors,
-              entry.published
-            );
+            const lookedUp =
+              isbnSource === "loc"
+                ? await fetchLocIsbn(
+                    entry.title,
+                    entry.authors,
+                    entry.published
+                  )
+                : await fetchOpenLibraryIsbn(
+                    entry.title,
+                    entry.authors,
+                    entry.published
+                  );
             isbnCache.set(cacheKey, lookedUp);
             isbnValue = lookedUp;
           }

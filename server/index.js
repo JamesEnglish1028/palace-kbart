@@ -263,6 +263,23 @@ const extractIsbnFromObject = (value) => {
   return [];
 };
 
+const locCache = new Map();
+const LOC_CACHE_TTL = 1000 * 60 * 60 * 24;
+
+const getCachedLoc = (key) => {
+  const entry = locCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > LOC_CACHE_TTL) {
+    locCache.delete(key);
+    return null;
+  }
+  return entry.isbn;
+};
+
+const setCachedLoc = (key, isbn) => {
+  locCache.set(key, { isbn, ts: Date.now() });
+};
+
 app.get("/loc-isbn", async (req, res) => {
   const title = String(req.query.title || "").trim();
   const author = String(req.query.author || "").trim();
@@ -270,6 +287,12 @@ app.get("/loc-isbn", async (req, res) => {
   const queryParts = [title, author, year].filter(Boolean);
   if (queryParts.length === 0) {
     res.status(400).send("Missing query parameters");
+    return;
+  }
+  const cacheKey = `${title}|${author}|${year}`.toLowerCase();
+  const cached = getCachedLoc(cacheKey);
+  if (cached !== null) {
+    res.json({ isbn: cached, cached: true });
     return;
   }
   const query = queryParts.join(" ");
@@ -288,6 +311,10 @@ app.get("/loc-isbn", async (req, res) => {
       },
       0
     );
+    if (searchResponse.status === 429) {
+      res.json({ isbn: "", rate_limited: true });
+      return;
+    }
     res.status(searchResponse.status);
     const buffer = Buffer.from(await searchResponse.arrayBuffer());
     if (!searchResponse.ok) {
@@ -303,6 +330,7 @@ app.get("/loc-isbn", async (req, res) => {
     const data = JSON.parse(buffer.toString("utf8"));
     const first = data?.results?.find((item) => item?.id);
     if (!first?.id) {
+      setCachedLoc(cacheKey, "");
       res.json({ isbn: "" });
       return;
     }
@@ -318,6 +346,10 @@ app.get("/loc-isbn", async (req, res) => {
       },
       0
     );
+    if (itemResponse.status === 429) {
+      res.json({ isbn: "", rate_limited: true });
+      return;
+    }
     const itemBuffer = Buffer.from(await itemResponse.arrayBuffer());
     if (!itemResponse.ok) {
       res.setHeader("content-type", "text/plain; charset=utf-8");
@@ -326,7 +358,57 @@ app.get("/loc-isbn", async (req, res) => {
     }
     const itemData = JSON.parse(itemBuffer.toString("utf8"));
     const candidates = extractIsbnFromObject(itemData);
-    res.json({ isbn: candidates[0] || "" });
+    const isbn = candidates[0] || "";
+    setCachedLoc(cacheKey, isbn);
+    res.json({ isbn });
+  } catch (error) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.status(502).send(String(error));
+  }
+});
+
+app.get("/ol-isbn", async (req, res) => {
+  const title = String(req.query.title || "").trim();
+  const author = String(req.query.author || "").trim();
+  const year = String(req.query.year || "").trim();
+  const queryParts = [title, author, year].filter(Boolean);
+  if (queryParts.length === 0) {
+    res.status(400).send("Missing query parameters");
+    return;
+  }
+  const params = new URLSearchParams();
+  if (title) params.set("title", title);
+  if (author) params.set("author", author);
+  if (year) params.set("first_publish_year", year);
+  params.set("limit", "5");
+  const searchUrl = `https://openlibrary.org/search.json?${params.toString()}`;
+  try {
+    const response = await fetchWithRedirects(
+      searchUrl,
+      {
+        Accept: "application/json",
+        "Accept-Encoding": "identity",
+        "User-Agent": "curl/8.4.0",
+      },
+      0
+    );
+    res.status(response.status);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!response.ok) {
+      res.setHeader("content-type", "text/plain; charset=utf-8");
+      res.end(buffer);
+      return;
+    }
+    const data = JSON.parse(buffer.toString("utf8"));
+    const docs = Array.isArray(data?.docs) ? data.docs : [];
+    const firstWithIsbn = docs.find((doc) => Array.isArray(doc?.isbn));
+    if (!firstWithIsbn) {
+      res.json({ isbn: "" });
+      return;
+    }
+    const isbnList = firstWithIsbn.isbn || [];
+    const normalized = extractIsbnFromObject(isbnList);
+    res.json({ isbn: normalized[0] || "" });
   } catch (error) {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.status(502).send(String(error));
