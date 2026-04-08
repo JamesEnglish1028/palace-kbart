@@ -1,5 +1,8 @@
 import type { OpdsFeed, OpdsLink, OpdsPublication } from "../types/opds";
 
+const OPDS_PROXY_BASE =
+  (import.meta as ImportMeta).env?.VITE_OPDS_PROXY_BASE || "/opds-proxy";
+
 const identifySourceIdType = (value: string) => {
   const trimmed = String(value || "").trim();
   if (!trimmed) return "";
@@ -101,15 +104,19 @@ const buildFeedRequestUrl = (href: string, base: string) => {
     const absolute = isAbsoluteUrl(href)
       ? href
       : new URL(href, base).toString();
-    return `/opds-proxy?url=${encodeURIComponent(absolute)}`;
+    if (OPDS_PROXY_BASE) {
+      const joiner = OPDS_PROXY_BASE.includes("?") ? "&" : "?";
+      return `${OPDS_PROXY_BASE}${joiner}url=${encodeURIComponent(absolute)}`;
+    }
+    return absolute;
   }
   return normalizeFeedUrl(href, base);
 };
 
 const buildFeedDisplayUrl = (href: string, base: string) => {
   if (!href) return "";
-  if (href.startsWith("/opds-proxy?url=")) {
-    const raw = href.split("/opds-proxy?url=")[1] || "";
+  if (href.includes("url=")) {
+    const raw = href.split("url=")[1] || "";
     try {
       return decodeURIComponent(raw);
     } catch (_error) {

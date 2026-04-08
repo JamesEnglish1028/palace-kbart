@@ -34,6 +34,11 @@ The app runs at `http://localhost:5173`.
   discovery services do not provide one.
 - `VITE_WEB_CLIENT_URL` (optional): Fallback Palace web client URL if discovery
   services do not provide one.
+- `VITE_BASE_PATH` (optional): Base path for static hosting (default `/`).
+- `VITE_OPDS_PROXY_BASE` (optional): Proxy endpoint for OPDS requests when
+  running on static hosting (e.g., `https://your-proxy.example.com/opds-proxy`).
+- `VITE_WEB_PROXY_BASE` (optional): Proxy endpoint for web client lookup when
+  running on static hosting (e.g., `https://your-proxy.example.com/web-proxy`).
 
 **KBART Columns**
 - `title_id`
@@ -59,3 +64,14 @@ Title URLs are constructed using the Palace web catalog URL pattern.
 
 This app uses TypeScript components and a registry-sync hook to keep the UI
 maintainable and testable.
+
+**Render Deployment**
+This repo includes a `render.yaml` that provisions:
+1. A web service proxy for OPDS (`palace-kbart-proxy`)
+2. A static site for the UI (`palace-kbart`)
+
+After the first deploy, update the static site environment variables to point
+at the proxy service URL, for example:
+
+- `VITE_OPDS_PROXY_BASE=https://palace-kbart-proxy.onrender.com/opds-proxy`
+- `VITE_WEB_PROXY_BASE=https://palace-kbart-proxy.onrender.com/web-proxy`

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const fetchWithRedirects = async (target, headers, depth = 0) => {
@@ -65,7 +65,11 @@ const proxyHandler = async (req, res, next) => {
 };
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const basePath = env.VITE_BASE_PATH || '/'
+  return {
+    base: basePath,
   plugins: [
     {
       name: 'opds-proxy',
@@ -75,31 +79,32 @@ export default defineConfig({
     },
     react(),
   ],
-  server: {
-    proxy: {
-      '/cm': {
-        target: 'http://localhost:6500',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/cm/, ''),
-      },
-      '/admin': {
-        target: 'http://localhost:6500',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/public': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/public/, ''),
-      },
-      '/registry': {
-        target: 'https://registry.palaceproject.io',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/registry/, ''),
+    server: {
+      proxy: {
+        '/cm': {
+          target: 'http://localhost:6500',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/cm/, ''),
+        },
+        '/admin': {
+          target: 'http://localhost:6500',
+          changeOrigin: true,
+          secure: false,
+        },
+        '/public': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/public/, ''),
+        },
+        '/registry': {
+          target: 'https://registry.palaceproject.io',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/registry/, ''),
+        },
       },
     },
-  },
+  }
 })

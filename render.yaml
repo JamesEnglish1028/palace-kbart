@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: palace-kbart-proxy
+    env: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+
+  - type: static
+    name: palace-kbart
+    rootDir: .
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_BASE_PATH
+        value: /
+      - key: VITE_OPDS_PROXY_BASE
+        value: https://palace-kbart-proxy.onrender.com/opds-proxy
+      - key: VITE_WEB_PROXY_BASE
+        value: https://palace-kbart-proxy.onrender.com/web-proxy

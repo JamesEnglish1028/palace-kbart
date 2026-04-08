@@ -15,6 +15,7 @@ import { exportKbart } from "./services/exporter";
 import { exportMarc } from "./services/marcExporter";
 
 const DEFAULT_FEED_BASE = import.meta.env.VITE_FEED_BASE || "/public";
+const WEB_PROXY_BASE = import.meta.env.VITE_WEB_PROXY_BASE || "/web-proxy";
 
 const STATUS_IDLE: Status = "idle";
 const STATUS_WORKING: Status = "working";
@@ -371,7 +372,9 @@ function App() {
       setWebClientStatus(STATUS_WORKING);
       setWebClientMessage("");
       const response = await fetch(
-        `/web-proxy?url=${encodeURIComponent(
+        `${WEB_PROXY_BASE}${
+          WEB_PROXY_BASE.includes("?") ? "&" : "?"
+        }url=${encodeURIComponent(
           "https://patron-academic.thepalaceproject.org/"
         )}`,
         {
