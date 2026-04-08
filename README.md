@@ -1,8 +1,9 @@
-# Palace KBART Exporter
+# KBART, MARC Exporter
 
-A lightweight React app for exporting KBART-formatted title lists from Palace
-Manager collections. It uses the public OPDS feeds to locate libraries and
-collections, then downloads a KBART CSV with Palace reader URLs.
+A lightweight React app for exporting KBART Holdings and MARC Bibliographic
+records from Palace Manager collections. It uses public OPDS feeds to locate
+libraries and collections, then downloads KBART CSV or MARC (MARC21/MARCXML)
+files with Palace web catalog URLs.
 
 **Quick Start**
 1. Install dependencies:
@@ -23,12 +24,10 @@ cp .env.example .env
 npm run dev
 ```
 
-The app runs at `http://localhost:5173` and proxies:
-- `/public` → `http://localhost:8080`
+The app runs at `http://localhost:5173`.
 
 **Environment Variables**
-- `VITE_API_BASE` (default `/cm`): Admin API base.
-- `VITE_FEED_BASE` (default `/public`): Public OPDS base.
+- `VITE_FEED_BASE` (default `/public`): OPDS base (optional when using absolute URLs).
 - `VITE_REGISTRY_BASE` (optional): Palace registry base for library sync
   (defaults to `https://registry.palaceproject.io/libraries`).
 - `VITE_BASE_URL` (optional): Fallback Palace base URL for `/works/...` if
@@ -49,9 +48,14 @@ The app runs at `http://localhost:5173` and proxies:
 - `access_type`
 - `source_id`
 - `source_id_type`
+- `provider_id` (populated for DOI, CNRI Handle, UUID)
 
-Title URLs are constructed using the Palace reader URL pattern from the MARC
-annotator logic.
+MARC output supports:
+- `MARC21 (ISO 2709)` and `MARCXML` formats
+- Basic book mapping + audiobook mapping (when `metadata["@type"]` is
+  `schema.org/Audiobook`)
+
+Title URLs are constructed using the Palace web catalog URL pattern.
 
 This app uses TypeScript components and a registry-sync hook to keep the UI
 maintainable and testable.
