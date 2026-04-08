@@ -72,12 +72,7 @@ const LOC_PROXY_BASE =
   (import.meta as ImportMeta).env?.VITE_OPDS_PROXY_BASE ||
   "";
 
-const buildLocProxyUrl = (url: string) => {
-  if (!url) return url;
-  if (!LOC_PROXY_BASE) return url;
-  const joiner = LOC_PROXY_BASE.includes("?") ? "&" : "?";
-  return `${LOC_PROXY_BASE}${joiner}url=${encodeURIComponent(url)}`;
-};
+const buildLocProxyUrl = () => LOC_PROXY_BASE;
 
 const normalizeIsbnValue = (value: string) => {
   const cleaned = String(value || "").replace(/[^0-9Xx]/g, "");
@@ -130,6 +125,9 @@ const fetchLocIsbn = async (
   const queryParts = [title, author, year].filter(Boolean);
   if (queryParts.length === 0) return "";
   let query = queryParts.join(" ");
+  if (query.includes(":")) {
+    query = query.split(":")[0].trim();
+  }
   if (query.length > 200) {
     query = query.slice(0, 200);
   }
@@ -139,11 +137,14 @@ const fetchLocIsbn = async (
     fa: "original-format:book",
   });
   const searchUrl = `https://www.loc.gov/search/?${params.toString()}`;
-  const response = await fetch(buildLocProxyUrl(searchUrl), {
-    method: "GET",
+  const proxyUrl = buildLocProxyUrl();
+  const response = await fetch(proxyUrl || searchUrl, {
+    method: proxyUrl ? "POST" : "GET",
     headers: {
       Accept: "application/json",
+      "Content-Type": "application/json",
     },
+    body: proxyUrl ? JSON.stringify({ url: searchUrl }) : undefined,
   });
   if (!response.ok) return "";
   const data = (await response.json()) as { results?: Array<{ id?: string }> };
@@ -152,11 +153,13 @@ const fetchLocIsbn = async (
   const itemUrl = first.id.includes("?")
     ? `${first.id}&fo=json&at=item`
     : `${first.id}?fo=json&at=item`;
-  const itemResponse = await fetch(buildLocProxyUrl(itemUrl), {
-    method: "GET",
+  const itemResponse = await fetch(proxyUrl || itemUrl, {
+    method: proxyUrl ? "POST" : "GET",
     headers: {
       Accept: "application/json",
+      "Content-Type": "application/json",
     },
+    body: proxyUrl ? JSON.stringify({ url: itemUrl }) : undefined,
   });
   if (!itemResponse.ok) return "";
   const itemData = await itemResponse.json();

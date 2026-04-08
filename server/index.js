@@ -5,7 +5,7 @@ const PORT = process.env.PORT || 8787;
 
 const allowCors = (req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept");
   if (req.method === "OPTIONS") {
     res.status(204).end();
@@ -33,6 +33,7 @@ const fetchWithRedirects = async (target, headers, depth = 0) => {
 };
 
 app.use(allowCors);
+app.use(express.json({ limit: "1mb" }));
 
 app.get("/", (_req, res) => {
   res.json({ ok: true, service: "palace-kbart-proxy" });
@@ -165,8 +166,11 @@ app.get("/registry-proxy", async (req, res) => {
   }
 });
 
-app.get("/loc-proxy", async (req, res) => {
-  const target = req.query.url;
+app.all("/loc-proxy", async (req, res) => {
+  const target =
+    req.method === "POST" && req.body && typeof req.body.url === "string"
+      ? req.body.url
+      : req.query.url;
   if (!target || typeof target !== "string") {
     res.status(400).send("Missing url parameter");
     return;
