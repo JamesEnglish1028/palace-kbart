@@ -12,6 +12,7 @@ import {
 import type { OpdsFeed } from "./types/opds";
 import { deriveFeedBaseFromUrl } from "./utils/registry";
 import { exportKbart } from "./services/exporter";
+import { exportMarc } from "./services/marcExporter";
 
 const DEFAULT_FEED_BASE = import.meta.env.VITE_FEED_BASE || "/public";
 
@@ -58,6 +59,13 @@ function App() {
   const [exportCount, setExportCount] = useState(0);
   const [exportPagesFetched, setExportPagesFetched] = useState(0);
   const [exportFeedUrl, setExportFeedUrl] = useState("");
+  const [marcFormat, setMarcFormat] = useState<"marc21" | "marcxml">("marc21");
+  const [marcFromDate, setMarcFromDate] = useState("");
+  const [marcStatus, setMarcStatus] = useState<Status>(STATUS_IDLE);
+  const [marcMessage, setMarcMessage] = useState("");
+  const [marcPagesFetched, setMarcPagesFetched] = useState(0);
+  const [marcFeedUrl, setMarcFeedUrl] = useState("");
+  const [marcCount, setMarcCount] = useState(0);
 
   const [webClientUrl, setWebClientUrl] = useState(
     import.meta.env.VITE_WEB_CLIENT_URL || ""
@@ -66,6 +74,7 @@ function App() {
   const [feedBaseOverride, setFeedBaseOverride] = useState(
     import.meta.env.VITE_FEED_BASE || ""
   );
+  const [fromDate, setFromDate] = useState("");
   const [webClientStatus, setWebClientStatus] = useState<Status>(STATUS_IDLE);
   const [webClientMessage, setWebClientMessage] = useState("");
 
@@ -143,18 +152,19 @@ function App() {
           Array.isArray(facet?.links) ? facet.links : []
         );
         return facetLinks
-          .filter((link) => link?.href && link?.title)
           .map((link) => ({
-            name: link.title,
-            href: link.href,
-          }));
+            name: link?.title || "",
+            href: link?.href || "",
+          }))
+          .filter((link) => link.name && link.href);
       };
 
       const extractFromGroups = (payload: OpdsFeed) => {
         if (!Array.isArray(payload?.groups) || payload.groups.length === 0) {
           return [] as CollectionItem[];
         }
-        return payload.groups.map((group) => {
+        return payload.groups
+          .map((group) => {
           const name =
             group?.metadata?.title ||
             group?.metadata?.name ||
@@ -172,7 +182,8 @@ function App() {
             name,
             href: bestLink?.href || "",
           };
-        });
+        })
+          .filter((item) => item.href);
       };
 
       let collectionItems: CollectionItem[] = [];
@@ -213,10 +224,10 @@ function App() {
             return Boolean(link?.title || link?.metadata?.title);
           })
           .map((link) => ({
-            name: link?.title || link?.metadata?.title || link?.href,
-            href: link?.href,
+            name: link?.title || link?.metadata?.title || link?.href || "",
+            href: link?.href || "",
           }))
-          .filter((link) => link.name);
+          .filter((link) => link.name && link.href);
         collectionItems = links;
       }
 
@@ -268,6 +279,7 @@ function App() {
         feedBase,
         baseUrl,
         webClientUrl,
+        fromDate,
         onProgress: (pages) => setExportPagesFetched(pages),
       });
       setExportFeedUrl(displayUrl);
@@ -289,6 +301,64 @@ function App() {
       setExportStatus(STATUS_ERROR);
       setExportMessage(
         error instanceof Error ? error.message : "Export failed."
+      );
+    }
+  };
+
+  const handleExportMarc = async () => {
+    setMarcStatus(STATUS_WORKING);
+    setMarcMessage("");
+    setMarcPagesFetched(0);
+    setMarcFeedUrl("");
+    setMarcCount(0);
+
+    try {
+      const collection = collections.find(
+        (item) => item.href === selectedCollectionHref
+      );
+      if (!collection) {
+        throw new Error("Select a collection to export.");
+      }
+      if (!webClientUrl.trim() || !baseUrl.trim()) {
+        throw new Error("Load the web client and base URLs before exporting.");
+      }
+
+      const { data, recordsCount, displayUrl, format } = await exportMarc({
+        libraryShortName: libraryShortName.trim(),
+        collectionName: collection.name,
+        collectionHref: collection.href,
+        feedBase,
+        baseUrl,
+        webClientUrl,
+        fromDate: marcFromDate,
+        format: marcFormat,
+        onProgress: (pages) => setMarcPagesFetched(pages),
+      });
+
+      setMarcFeedUrl(displayUrl);
+      setMarcCount(recordsCount);
+
+      const mimeType =
+        format === "marcxml"
+          ? "application/xml;charset=utf-8;"
+          : "application/marc";
+      const extension = format === "marcxml" ? "xml" : "mrc";
+      const blob = new Blob([data], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${collection.name}-marc.${extension}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+
+      setMarcStatus(STATUS_SUCCESS);
+      setMarcMessage(`Exported ${recordsCount} records for ${collection.name}.`);
+    } catch (error) {
+      setMarcStatus(STATUS_ERROR);
+      setMarcMessage(
+        error instanceof Error ? error.message : "MARC export failed."
       );
     }
   };
@@ -401,19 +471,13 @@ function App() {
                 <span>Palace Manager Tooling</span>
               </div>
               <h1 className="mt-3 text-4xl font-semibold text-slate-900 md:text-5xl">
-                Palace KBART Exporter
+                KBART, MARC Exporter
               </h1>
               <p className="mt-3 max-w-2xl text-base text-slate-600">
-                Download KBART reports from Palace Manager collections with
-                Palace Web Catalog URLs.
+                Download KBART Holdings and MARC Bibliographic records for
+                Palace Manager collections.
               </p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600">
-              <p className="font-semibold">Connections</p>
-              <p className="mt-1">`/cm` → localhost:6500</p>
-              <p className="mt-1">`/public` → localhost:8080</p>
-            </div>
-          </div>
+            </div>          </div>
         </header>
 
         <RegistryPanel
@@ -457,11 +521,23 @@ function App() {
             setBaseUrl={setBaseUrl}
             webClientUrl={webClientUrl}
             setWebClientUrl={setWebClientUrl}
+            fromDate={fromDate}
+            setFromDate={setFromDate}
             onExport={handleExport}
             exportStatus={exportStatus}
             exportMessage={exportMessage}
             exportPagesFetched={exportPagesFetched}
             exportFeedUrl={exportFeedUrl}
+            marcCount={marcCount}
+            marcFromDate={marcFromDate}
+            setMarcFromDate={setMarcFromDate}
+            marcFormat={marcFormat}
+            setMarcFormat={setMarcFormat}
+            onExportMarc={handleExportMarc}
+            marcStatus={marcStatus}
+            marcMessage={marcMessage}
+            marcPagesFetched={marcPagesFetched}
+            marcFeedUrl={marcFeedUrl}
             webClientStatus={webClientStatus}
             webClientMessage={webClientMessage}
             onAutoFillWebClient={() =>

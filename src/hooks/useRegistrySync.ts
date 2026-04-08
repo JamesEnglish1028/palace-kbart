@@ -92,7 +92,7 @@ function useRegistrySync(initialRegistryBase: string): RegistryState {
       throw new Error(`Registry request failed with ${response.status}`);
     }
     const data = await response.json();
-    const items = normalizeRegistryLibraries(data).map((entry) => {
+    const items = normalizeRegistryLibraries(data).map((entry: unknown) => {
       const name = extractLibraryName(entry);
       const shortName = extractLibraryShortName(entry);
       const opdsUrl = extractLibraryOpdsUrl(entry);
@@ -102,7 +102,7 @@ function useRegistrySync(initialRegistryBase: string): RegistryState {
         opdsUrl,
       };
     });
-    items.forEach((item) => accumulator.push(item));
+    items.forEach((item: RegistryLibrary) => accumulator.push(item));
     setRegistryPages((prev) => prev + 1);
     setRegistryCount(accumulator.length);
 

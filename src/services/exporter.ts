@@ -14,6 +14,7 @@ type ExportOptions = {
   feedBase: string;
   baseUrl: string;
   webClientUrl: string;
+  fromDate?: string;
   onProgress?: (pagesFetched: number) => void;
 };
 
@@ -30,11 +31,61 @@ const DEFAULT_KBART_HEADERS = [
   "access_type",
   "source_id",
   "source_id_type",
+  "provider_id",
 ];
+
+const extractProviderId = (identifier: string, sourceIdType: string) => {
+  if (sourceIdType === "DOI") {
+    const trimmed = identifier.trim();
+    const doiUrlMatch = trimmed.match(
+      /^https?:\/\/(?:dx\.)?doi\.org\/(.+)$/i
+    );
+    if (doiUrlMatch) {
+      return doiUrlMatch[1];
+    }
+    const doiUrnMatch = trimmed.match(/^urn:doi:(.+)$/i);
+    if (doiUrnMatch) {
+      return doiUrnMatch[1];
+    }
+    return "";
+  }
+  if (sourceIdType === "CNRI Handle") {
+    const trimmed = identifier.trim();
+    const handleMatch = trimmed.match(/^https?:\/\/hdl\.handle\.net\/(.+)$/i);
+    if (handleMatch) {
+      return handleMatch[1];
+    }
+  }
+  if (sourceIdType === "UUID") {
+    const trimmed = identifier.trim();
+    const uuidMatch = trimmed.match(/^urn:uuid:(.+)$/i);
+    if (uuidMatch) {
+      return uuidMatch[1];
+    }
+  }
+  return "";
+};
+
+const shouldContinueCrawl = (
+  entries: ReturnType<typeof parseOpds2Feed>["items"],
+  fromDateValue: number | null
+) => {
+  if (!fromDateValue) return true;
+  if (entries.length === 0) return false;
+  const hasUnknownModified = entries.some(
+    (entry) => !entry.modified || !Number.isFinite(Date.parse(entry.modified))
+  );
+  if (hasUnknownModified) return true;
+  const hasRecent = entries.some(
+    (entry) => Date.parse(entry.modified ?? "") >= fromDateValue
+  );
+  return hasRecent;
+};
 
 const fetchOpdsEntries = async (
   feedUrl: string,
   feedBase: string,
+  fromDateValue: number | null,
   onProgress: ((pagesFetched: number) => void) | undefined,
   accumulator: ReturnType<typeof parseOpds2Feed>["items"] = [],
   pagesFetched = 0
@@ -62,11 +113,12 @@ const fetchOpdsEntries = async (
     onProgress(nextPages);
   }
 
-  if (nextHref) {
+  if (nextHref && shouldContinueCrawl(items, fromDateValue)) {
     const nextUrl = buildFeedRequestUrl(nextHref, feedBase);
     return fetchOpdsEntries(
       nextUrl,
       feedBase,
+      fromDateValue,
       onProgress,
       accumulator,
       nextPages
@@ -91,18 +143,28 @@ const exportKbart = async ({
   feedBase,
   baseUrl,
   webClientUrl,
+  fromDate,
   onProgress,
 }: ExportOptions) => {
   const collectionFeedUrl = buildFeedRequestUrl(collectionHref, feedBase);
   const displayUrl = buildFeedDisplayUrl(collectionHref, feedBase);
+  const parsedFromDate = fromDate ? Date.parse(fromDate) : NaN;
+  const fromDateValue = Number.isFinite(parsedFromDate)
+    ? parsedFromDate
+    : null;
   const entries = await fetchOpdsEntries(
     collectionFeedUrl,
     feedBase,
+    fromDateValue,
     onProgress
   );
-
   const rows = entries
     .filter((entry) => isLikelyIdentifier(entry.identifier))
+    .filter((entry) => {
+      if (!fromDateValue) return true;
+      const modified = entry.modified ? Date.parse(entry.modified) : NaN;
+      return Number.isFinite(modified) && modified >= fromDateValue;
+    })
     .map((entry) => {
       const identifier = entry.identifier;
       const workIdentifier = identifierForWorkUrl(identifier);
@@ -127,6 +189,7 @@ const exportKbart = async ({
         "P",
         collectionName,
         identifySourceIdType(identifier),
+        extractProviderId(identifier, identifySourceIdType(identifier)),
       ];
     })
     .filter(Boolean) as string[][];

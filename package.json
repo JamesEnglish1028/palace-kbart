@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@natlibfi/marc-record": "^10.0.1",
+    "@natlibfi/marc-record-serializers": "^11.0.2",
+    "events": "^3.3.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },

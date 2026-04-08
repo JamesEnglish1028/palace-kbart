@@ -4,10 +4,15 @@ const identifySourceIdType = (value: string) => {
   const trimmed = String(value || "").trim();
   if (!trimmed) return "";
   if (trimmed.toLowerCase().startsWith("urn:isbn:")) return "ISBN";
-  if (trimmed.toLowerCase().startsWith("urn:uuid:")) return "URN";
+  if (trimmed.toLowerCase().includes("isbn.org")) return "ISBN";
+  if (trimmed.toLowerCase().includes("isbn")) return "ISBN";
+  if (trimmed.toLowerCase().includes("document-id")) return "DocID";
+  if (trimmed.toLowerCase().includes("doi.org")) return "DOI";
+  if (trimmed.toLowerCase().includes("urn:doi:")) return "DOI";
+  if (trimmed.toLowerCase().includes("hdl.handle.net")) return "CNRI Handle";
+  if (trimmed.toLowerCase().startsWith("urn:uuid:")) return "UUID";
   if (trimmed.toLowerCase().startsWith("urn:")) return "URN";
   if (/^https?:\/\//i.test(trimmed)) return "URI";
-  if (trimmed.toLowerCase().includes("document-id")) return "DocID";
   if (trimmed.toLowerCase().includes("media")) return "Media ID";
   return "URI";
 };
@@ -163,15 +168,88 @@ const normalizePublisher = (value: unknown) => {
   return "";
 };
 
+const normalizePublisherPlace = (
+  value: unknown,
+  fallback?: string
+) => {
+  if (fallback) return fallback;
+  if (!value) return "";
+  if (Array.isArray(value)) {
+    const first = value.find((item) => typeof item === "object" && item?.place);
+    return (first as { place?: string })?.place || "";
+  }
+  if (typeof value === "object") {
+    return (value as { place?: string }).place || "";
+  }
+  return "";
+};
+
+const normalizeDescription = (value: unknown) => {
+  if (!value) return "";
+  if (Array.isArray(value)) {
+    const first = value.find((item) =>
+      typeof item === "string" ? item : item?.value
+    );
+    if (!first) return "";
+    return typeof first === "string" ? first : first?.value || "";
+  }
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    return (value as { value?: string }).value || "";
+  }
+  return "";
+};
+
+const normalizeSubjectList = (value: unknown) => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item : item?.name))
+      .filter(Boolean) as string[];
+  }
+  if (typeof value === "string") return [value];
+  if (typeof value === "object") {
+    const name = (value as { name?: string }).name;
+    return name ? [name] : [];
+  }
+  return [];
+};
+
+const normalizeLanguageList = (value: unknown) => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item : item?.value))
+      .filter(Boolean) as string[];
+  }
+  if (typeof value === "string") return [value];
+  if (typeof value === "object") {
+    const val = (value as { value?: string }).value;
+    return val ? [val] : [];
+  }
+  return [];
+};
+
 const parseOpds2Publication = (publication: OpdsPublication) => {
   const metadata = publication?.metadata || {};
+  const entryType = metadata["@type"] || "";
   const title = metadata.title || "";
   const authors = normalizeFirstPerson(metadata.author);
   const contributors = normalizeFirstPerson(metadata.contributor);
   const identifier = extractIdentifierValue(metadata.identifier || metadata.id);
   const publisher = normalizePublisher(metadata.publisher);
+  const publisherPlace = normalizePublisherPlace(
+    metadata.publisher,
+    metadata.publisher_place || metadata.place || ""
+  );
+  const edition = metadata.edition || "";
   const published = metadata.published || metadata.published_date || "";
+  const modified = metadata.modified || "";
   const editors = normalizePersonList(metadata.editor);
+  const description = normalizeDescription(metadata.description);
+  const subjects = normalizeSubjectList(metadata.subject);
+  const languages = normalizeLanguageList(metadata.language);
+  const links = Array.isArray(publication?.links) ? publication.links : [];
 
   let urn = identifier;
   if (!urn && publication?.links?.length) {
@@ -184,12 +262,20 @@ const parseOpds2Publication = (publication: OpdsPublication) => {
   }
 
   return {
+    type: entryType,
     title,
     authors: authors || contributors || "Unlisted",
     identifier: urn,
     publisher,
+    publisherPlace,
+    edition,
     published,
+    modified,
     editors,
+    description,
+    subjects,
+    languages,
+    links,
   };
 };
 
@@ -198,9 +284,9 @@ const parseOpds2Feed = (data: OpdsFeed) => {
     ? data.publications
     : [];
   const items = publications.map(parseOpds2Publication);
-  const nextLink =
-    Array.isArray(data?.links) &&
-    data.links.find((link: OpdsLink) => (link.rel || "").includes("next"));
+  const nextLink = Array.isArray(data?.links)
+    ? data.links.find((link: OpdsLink) => (link.rel || "").includes("next"))
+    : undefined;
   return { items, nextHref: nextLink?.href || "" };
 };
 
