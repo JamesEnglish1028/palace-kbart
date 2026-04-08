@@ -60,9 +60,12 @@ app.get("/opds-proxy", async (req, res) => {
     );
     res.status(response.status);
     response.headers.forEach((value, key) => {
-      if (key.toLowerCase() === "content-encoding") return;
+      const lower = key.toLowerCase();
+      if (lower === "content-encoding" || lower === "access-control-allow-origin")
+        return;
       res.setHeader(key, value);
     });
+    res.setHeader("Access-Control-Allow-Origin", "*");
     const buffer = Buffer.from(await response.arrayBuffer());
     if (!response.ok) {
       const location = response.headers.get("location");
@@ -97,9 +100,12 @@ app.get("/web-proxy", async (req, res) => {
     );
     res.status(response.status);
     response.headers.forEach((value, key) => {
-      if (key.toLowerCase() === "content-encoding") return;
+      const lower = key.toLowerCase();
+      if (lower === "content-encoding" || lower === "access-control-allow-origin")
+        return;
       res.setHeader(key, value);
     });
+    res.setHeader("Access-Control-Allow-Origin", "*");
     const buffer = Buffer.from(await response.arrayBuffer());
     if (!response.ok) {
       const location = response.headers.get("location");
@@ -134,9 +140,12 @@ app.get("/registry-proxy", async (req, res) => {
     );
     res.status(response.status);
     response.headers.forEach((value, key) => {
-      if (key.toLowerCase() === "content-encoding") return;
+      const lower = key.toLowerCase();
+      if (lower === "content-encoding" || lower === "access-control-allow-origin")
+        return;
       res.setHeader(key, value);
     });
+    res.setHeader("Access-Control-Allow-Origin", "*");
     const buffer = Buffer.from(await response.arrayBuffer());
     if (!response.ok) {
       const location = response.headers.get("location");
