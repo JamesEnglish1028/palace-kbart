@@ -61,6 +61,7 @@ function App() {
   const [exportPagesFetched, setExportPagesFetched] = useState(0);
   const [exportFeedUrl, setExportFeedUrl] = useState("");
   const [enrichIsbn, setEnrichIsbn] = useState(false);
+  const [locEstimate, setLocEstimate] = useState("");
   const [marcFormat, setMarcFormat] = useState<"marc21" | "marcxml">("marc21");
   const [marcFromDate, setMarcFromDate] = useState("");
   const [marcStatus, setMarcStatus] = useState<Status>(STATUS_IDLE);
@@ -263,6 +264,7 @@ function App() {
     setExportCount(0);
     setExportPagesFetched(0);
     setExportFeedUrl("");
+    setLocEstimate("");
 
     try {
       const collection = collections.find(
@@ -284,6 +286,15 @@ function App() {
         fromDate,
         enrichIsbn,
         onProgress: (pages) => setExportPagesFetched(pages),
+        onLocEstimate: (count, seconds) => {
+          if (!enrichIsbn || count === 0) return;
+          const minutes = Math.ceil(seconds / 60);
+          setLocEstimate(
+            `ISBN enrichment may take ~${minutes} minute${
+              minutes === 1 ? "" : "s"
+            } for ${count} lookups at 20/minute.`
+          );
+        },
       });
       setExportFeedUrl(displayUrl);
       setExportCount(rowsCount);
@@ -535,6 +546,7 @@ function App() {
             exportFeedUrl={exportFeedUrl}
             enrichIsbn={enrichIsbn}
             setEnrichIsbn={setEnrichIsbn}
+            locEstimate={locEstimate}
             marcCount={marcCount}
             marcFromDate={marcFromDate}
             setMarcFromDate={setMarcFromDate}

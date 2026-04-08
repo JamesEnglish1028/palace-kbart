@@ -19,6 +19,7 @@ type ExportPanelProps = {
   exportFeedUrl: string;
   enrichIsbn: boolean;
   setEnrichIsbn: (value: boolean) => void;
+  locEstimate: string;
   marcCount: number;
   marcFromDate: string;
   setMarcFromDate: (value: string) => void;
@@ -50,6 +51,7 @@ function ExportPanel({
   exportFeedUrl,
   enrichIsbn,
   setEnrichIsbn,
+  locEstimate,
   marcCount,
   marcFromDate,
   setMarcFromDate,
@@ -191,6 +193,11 @@ function ExportPanel({
                 Enrich missing ISBNs using Library of Congress (slower).
               </span>
             </label>
+            {locEstimate && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
+                {locEstimate}
+              </div>
+            )}
             <button
               type="button"
               className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"

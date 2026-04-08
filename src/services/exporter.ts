@@ -16,6 +16,7 @@ type ExportOptions = {
   webClientUrl: string;
   fromDate?: string;
   onProgress?: (pagesFetched: number) => void;
+  onLocEstimate?: (count: number, seconds: number) => void;
 };
 
 const DEFAULT_KBART_HEADERS = [
@@ -80,6 +81,24 @@ const buildLocIsbnUrl = () => {
   return LOC_PROXY_BASE;
 };
 
+const locState = {
+  delayMs: 500,
+  lastRequest: 0,
+};
+
+let locQueue: Promise<unknown> = Promise.resolve();
+
+const runLocTask = async <T>(task: () => Promise<T>) => {
+  const next = locQueue.then(task, task);
+  locQueue = next.catch(() => undefined);
+  return next;
+};
+
+const delay = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
 const normalizeIsbnValue = (value: string) => {
   const cleaned = String(value || "").replace(/[^0-9Xx]/g, "");
   if (!cleaned) return "";
@@ -141,15 +160,32 @@ const fetchLocIsbn = async (
   const requestUrl = `${proxyUrl}?title=${encodeURIComponent(
     title
   )}&author=${encodeURIComponent(author)}&year=${encodeURIComponent(year)}`;
-  const finalResponse = await fetch(requestUrl, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-    },
+  return runLocTask(async () => {
+    let attempt = 0;
+    while (attempt < 3) {
+      const waitMs = Math.max(0, locState.lastRequest + locState.delayMs - Date.now());
+      if (waitMs > 0) {
+        await delay(waitMs);
+      }
+      locState.lastRequest = Date.now();
+      const finalResponse = await fetch(requestUrl, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+      if (finalResponse.status === 429) {
+        locState.delayMs = Math.min(locState.delayMs * 2, 8000);
+        attempt += 1;
+        await delay(locState.delayMs);
+        continue;
+      }
+      if (!finalResponse.ok) return "";
+      const payload = (await finalResponse.json()) as { isbn?: string };
+      return payload?.isbn || "";
+    }
+    return "";
   });
-  if (!finalResponse.ok) return "";
-  const payload = (await finalResponse.json()) as { isbn?: string };
-  return payload?.isbn || "";
 };
 
 const shouldContinueCrawl = (
@@ -232,6 +268,7 @@ const exportKbart = async ({
   fromDate,
   onProgress,
   enrichIsbn,
+  onLocEstimate,
 }: ExportOptions & { enrichIsbn?: boolean }) => {
   const collectionFeedUrl = buildFeedRequestUrl(collectionHref, feedBase);
   const displayUrl = buildFeedDisplayUrl(collectionHref, feedBase);
@@ -246,18 +283,27 @@ const exportKbart = async ({
     onProgress
   );
   const isbnCache = new Map<string, string>();
+  const filteredEntries = entries
+    .filter((entry) => isLikelyIdentifier(entry.identifier))
+    .filter((entry) => {
+      if (!fromDateValue) return true;
+      const modified = entry.modified ? Date.parse(entry.modified) : NaN;
+      return Number.isFinite(modified) && modified >= fromDateValue;
+    });
+
+  if (enrichIsbn && onLocEstimate) {
+    const lookupCount = filteredEntries.filter(
+      (entry) => identifySourceIdType(entry.identifier) !== "ISBN"
+    ).length;
+    const seconds = Math.ceil((lookupCount / 20) * 60);
+    onLocEstimate(lookupCount, seconds);
+  }
+
   const rows = await Promise.all(
-    entries
-      .filter((entry) => isLikelyIdentifier(entry.identifier))
-      .filter((entry) => {
-        if (!fromDateValue) return true;
-        const modified = entry.modified ? Date.parse(entry.modified) : NaN;
-        return Number.isFinite(modified) && modified >= fromDateValue;
-      })
-      .map(async (entry) => {
-        const identifier = entry.identifier;
-        const workIdentifier = identifierForWorkUrl(identifier);
-        if (!workIdentifier) return null;
+    filteredEntries.map(async (entry) => {
+      const identifier = entry.identifier;
+      const workIdentifier = identifierForWorkUrl(identifier);
+      if (!workIdentifier) return null;
         const qualifiedIdentifier = encodeURIComponent(
           `${workIdentifier.type}/${workIdentifier.value}`
         );
