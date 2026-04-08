@@ -39,6 +39,8 @@ The app runs at `http://localhost:5173`.
   running on static hosting (e.g., `https://your-proxy.example.com/opds-proxy`).
 - `VITE_WEB_PROXY_BASE` (optional): Proxy endpoint for web client lookup when
   running on static hosting (e.g., `https://your-proxy.example.com/web-proxy`).
+- `VITE_REGISTRY_PROXY_BASE` (optional): Proxy endpoint for registry sync when
+  running on static hosting (e.g., `https://your-proxy.example.com/registry-proxy`).
 
 **KBART Columns**
 - `title_id`
@@ -75,3 +77,4 @@ at the proxy service URL, for example:
 
 - `VITE_OPDS_PROXY_BASE=https://palace-kbart-proxy.onrender.com/opds-proxy`
 - `VITE_WEB_PROXY_BASE=https://palace-kbart-proxy.onrender.com/web-proxy`
+- `VITE_REGISTRY_PROXY_BASE=https://palace-kbart-proxy.onrender.com/registry-proxy`

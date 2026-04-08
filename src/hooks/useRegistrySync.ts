@@ -78,11 +78,24 @@ function useRegistrySync(initialRegistryBase: string): RegistryState {
     );
   }, [libraryQuery, registryLibraries]);
 
+  const REGISTRY_PROXY_BASE =
+    (import.meta as ImportMeta).env?.VITE_REGISTRY_PROXY_BASE ||
+    (import.meta as ImportMeta).env?.VITE_OPDS_PROXY_BASE ||
+    "/registry-proxy";
+
+  const buildRegistryUrl = (url: string) => {
+    if (!url) return url;
+    if (!REGISTRY_PROXY_BASE) return url;
+    if (!/^https?:\/\//i.test(url)) return url;
+    const joiner = REGISTRY_PROXY_BASE.includes("?") ? "&" : "?";
+    return `${REGISTRY_PROXY_BASE}${joiner}url=${encodeURIComponent(url)}`;
+  };
+
   const crawlRegistry = async (
     startUrl: string,
     accumulator: RegistryLibrary[]
   ): Promise<RegistryLibrary[]> => {
-    const response = await fetch(startUrl, {
+    const response = await fetch(buildRegistryUrl(startUrl), {
       method: "GET",
       headers: {
         Accept: "application/json, application/opds+json",
