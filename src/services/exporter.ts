@@ -31,7 +31,7 @@ const DEFAULT_KBART_HEADERS = [
   "access_type",
   "source_id",
   "source_id_type",
-  "provider_id",
+  "vendor_id",
 ];
 
 const extractProviderId = (identifier: string, sourceIdType: string) => {

@@ -55,7 +55,7 @@ The app runs at `http://localhost:5173`.
 - `access_type`
 - `source_id`
 - `source_id_type`
-- `provider_id` (populated for DOI, CNRI Handle, UUID)
+- `vendor_id` (populated for DOI, CNRI Handle, UUID)
 
 MARC output supports:
 - `MARC21 (ISO 2709)` and `MARCXML` formats
