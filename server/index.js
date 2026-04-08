@@ -38,6 +38,10 @@ app.get("/", (_req, res) => {
   res.json({ ok: true, service: "palace-kbart-proxy" });
 });
 
+app.get("/healthz", (_req, res) => {
+  res.json({ ok: true, status: "healthy" });
+});
+
 app.get("/opds-proxy", async (req, res) => {
   const target = req.query.url;
   if (!target || typeof target !== "string") {
