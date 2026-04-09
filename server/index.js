@@ -1,3 +1,4 @@
+/* global process, fetch, URL, setTimeout, Buffer, URLSearchParams, console */
 import express from "express";
 
 const app = express();
@@ -34,6 +35,42 @@ const fetchWithRedirects = async (target, headers, depth = 0) => {
     return fetchWithRedirects(nextUrl, headers, depth + 1);
   }
   return response;
+};
+
+const delay = (ms) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const LOC_MIN_INTERVAL_MS = 3000;
+let locRequestQueue = Promise.resolve();
+let locLastRequestAt = 0;
+
+const runLocRequest = async (task) => {
+  const run = async () => {
+    const waitMs = Math.max(0, locLastRequestAt + LOC_MIN_INTERVAL_MS - Date.now());
+    if (waitMs > 0) {
+      await delay(waitMs);
+    }
+    locLastRequestAt = Date.now();
+    return task();
+  };
+  const next = locRequestQueue.then(run, run);
+  locRequestQueue = next.catch(() => undefined);
+  return next;
+};
+
+const isRateLimitedLocStatus = (status) => status === 429 || status === 403;
+
+const isHtmlOrCaptchaResponse = (buffer, contentType) => {
+  const type = String(contentType || "").toLowerCase();
+  if (type.includes("text/html")) return true;
+  const snippet = buffer.toString("utf8").slice(0, 2000).toLowerCase();
+  return (
+    snippet.includes("<html") ||
+    snippet.includes("captcha") ||
+    snippet.includes("recaptcha")
+  );
 };
 
 app.use(allowCors);
@@ -299,19 +336,23 @@ app.get("/loc-isbn", async (req, res) => {
   const params = new URLSearchParams({
     q: query,
     fo: "json",
+    at: "results",
+    c: "1",
   });
   const searchUrl = `https://www.loc.gov/books/?${params.toString()}`;
   try {
-    const searchResponse = await fetchWithRedirects(
-      searchUrl,
-      {
-        Accept: "application/json",
-        "Accept-Encoding": "identity",
-        "User-Agent": "curl/8.4.0",
-      },
-      0
+    const searchResponse = await runLocRequest(() =>
+      fetchWithRedirects(
+        searchUrl,
+        {
+          Accept: "application/json",
+          "Accept-Encoding": "identity",
+          "User-Agent": "curl/8.4.0",
+        },
+        0
+      )
     );
-    if (searchResponse.status === 429) {
+    if (isRateLimitedLocStatus(searchResponse.status)) {
       res.json({ isbn: "", rate_limited: true });
       return;
     }
@@ -323,11 +364,17 @@ app.get("/loc-isbn", async (req, res) => {
       return;
     }
     const contentType = searchResponse.headers.get("content-type") || "";
-    if (!contentType.includes("json")) {
-      res.json({ isbn: "" });
+    if (!contentType.includes("json") || isHtmlOrCaptchaResponse(buffer, contentType)) {
+      res.json({ isbn: "", rate_limited: true });
       return;
     }
-    const data = JSON.parse(buffer.toString("utf8"));
+    let data;
+    try {
+      data = JSON.parse(buffer.toString("utf8"));
+    } catch {
+      res.json({ isbn: "", rate_limited: true });
+      return;
+    }
     const first = data?.results?.find((item) => item?.id);
     if (!first?.id) {
       setCachedLoc(cacheKey, "");
@@ -337,16 +384,18 @@ app.get("/loc-isbn", async (req, res) => {
     const itemUrl = first.id.includes("?")
       ? `${first.id}&fo=json&at=item`
       : `${first.id}?fo=json&at=item`;
-    const itemResponse = await fetchWithRedirects(
-      itemUrl,
-      {
-        Accept: "application/json",
-        "Accept-Encoding": "identity",
-        "User-Agent": "curl/8.4.0",
-      },
-      0
+    const itemResponse = await runLocRequest(() =>
+      fetchWithRedirects(
+        itemUrl,
+        {
+          Accept: "application/json",
+          "Accept-Encoding": "identity",
+          "User-Agent": "curl/8.4.0",
+        },
+        0
+      )
     );
-    if (itemResponse.status === 429) {
+    if (isRateLimitedLocStatus(itemResponse.status)) {
       res.json({ isbn: "", rate_limited: true });
       return;
     }
@@ -356,7 +405,21 @@ app.get("/loc-isbn", async (req, res) => {
       res.end(itemBuffer);
       return;
     }
-    const itemData = JSON.parse(itemBuffer.toString("utf8"));
+    const itemContentType = itemResponse.headers.get("content-type") || "";
+    if (
+      !itemContentType.includes("json") ||
+      isHtmlOrCaptchaResponse(itemBuffer, itemContentType)
+    ) {
+      res.json({ isbn: "", rate_limited: true });
+      return;
+    }
+    let itemData;
+    try {
+      itemData = JSON.parse(itemBuffer.toString("utf8"));
+    } catch {
+      res.json({ isbn: "", rate_limited: true });
+      return;
+    }
     const candidates = extractIsbnFromObject(itemData);
     const isbn = candidates[0] || "";
     setCachedLoc(cacheKey, isbn);
@@ -416,6 +479,5 @@ app.get("/ol-isbn", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
   console.log(`Proxy listening on ${PORT}`);
 });

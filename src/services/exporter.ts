@@ -68,29 +68,34 @@ const extractProviderId = (identifier: string, sourceIdType: string) => {
   return "";
 };
 
-const LOC_PROXY_BASE =
-  (import.meta as ImportMeta).env?.VITE_LOC_PROXY_BASE ||
-  (import.meta as ImportMeta).env?.VITE_OPDS_PROXY_BASE ||
-  "";
-const OL_PROXY_BASE =
-  (import.meta as ImportMeta).env?.VITE_OL_PROXY_BASE ||
-  (import.meta as ImportMeta).env?.VITE_OPDS_PROXY_BASE ||
-  "";
+const LOC_PROXY_BASE = (import.meta as ImportMeta).env?.VITE_LOC_PROXY_BASE || "";
+const OL_PROXY_BASE = (import.meta as ImportMeta).env?.VITE_OL_PROXY_BASE || "";
+const OPDS_PROXY_BASE = (import.meta as ImportMeta).env?.VITE_OPDS_PROXY_BASE || "";
 
 const buildLocIsbnUrl = () => {
-  if (!LOC_PROXY_BASE) return "";
-  if (LOC_PROXY_BASE.endsWith("/loc-proxy")) {
-    return LOC_PROXY_BASE.replace(/\/loc-proxy$/, "/loc-isbn");
+  if (LOC_PROXY_BASE) {
+    if (LOC_PROXY_BASE.endsWith("/loc-proxy")) {
+      return LOC_PROXY_BASE.replace(/\/loc-proxy$/, "/loc-isbn");
+    }
+    return LOC_PROXY_BASE;
   }
-  return LOC_PROXY_BASE;
+  if (OPDS_PROXY_BASE.endsWith("/opds-proxy")) {
+    return OPDS_PROXY_BASE.replace(/\/opds-proxy$/, "/loc-isbn");
+  }
+  return "";
 };
 
 const buildOlIsbnUrl = () => {
-  if (!OL_PROXY_BASE) return "";
-  if (OL_PROXY_BASE.endsWith("/ol-proxy")) {
-    return OL_PROXY_BASE.replace(/\/ol-proxy$/, "/ol-isbn");
+  if (OL_PROXY_BASE) {
+    if (OL_PROXY_BASE.endsWith("/ol-proxy")) {
+      return OL_PROXY_BASE.replace(/\/ol-proxy$/, "/ol-isbn");
+    }
+    return OL_PROXY_BASE;
   }
-  return OL_PROXY_BASE;
+  if (OPDS_PROXY_BASE.endsWith("/opds-proxy")) {
+    return OPDS_PROXY_BASE.replace(/\/opds-proxy$/, "/ol-isbn");
+  }
+  return "";
 };
 
 const locState = {
@@ -127,30 +132,6 @@ const normalizeIsbnValue = (value: string) => {
   return `${prefix}${check}`;
 };
 
-const extractIsbnFromObject = (value: unknown): string[] => {
-  if (!value) return [];
-  if (typeof value === "string") {
-    const normalized = normalizeIsbnValue(value);
-    return normalized ? [normalized] : [];
-  }
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => extractIsbnFromObject(item));
-  }
-  if (typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    const matches: string[] = [];
-    Object.entries(obj).forEach(([key, val]) => {
-      if (key.toLowerCase().includes("isbn")) {
-        matches.push(...extractIsbnFromObject(val));
-      } else if (typeof val === "object") {
-        matches.push(...extractIsbnFromObject(val));
-      }
-    });
-    return matches;
-  }
-  return [];
-};
-
 const fetchLocIsbn = async (
   title: string,
   author: string,
@@ -162,13 +143,6 @@ const fetchLocIsbn = async (
   const year = yearMatch ? yearMatch[0] : "";
   const queryParts = [title, author, year].filter(Boolean);
   if (queryParts.length === 0) return "";
-  let query = queryParts.join(" ");
-  if (query.includes(":")) {
-    query = query.split(":")[0].trim();
-  }
-  if (query.length > 200) {
-    query = query.slice(0, 200);
-  }
   const requestUrl = `${proxyUrl}?title=${encodeURIComponent(
     title
   )}&author=${encodeURIComponent(author)}&year=${encodeURIComponent(year)}`;
@@ -336,7 +310,7 @@ const exportKbart = async ({
     ).length;
     const seconds =
       isbnSource === "loc"
-        ? Math.ceil((lookupCount / 20) * 60)
+        ? Math.ceil((lookupCount / 10) * 60)
         : Math.ceil((lookupCount / 60) * 60);
     onLocEstimate(lookupCount, seconds);
   }

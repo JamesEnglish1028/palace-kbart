@@ -42,9 +42,9 @@ The app runs at `http://localhost:5173`.
 - `VITE_REGISTRY_PROXY_BASE` (optional): Proxy endpoint for registry sync when
   running on static hosting (e.g., `https://your-proxy.example.com/registry-proxy`).
 - `VITE_LOC_PROXY_BASE` (optional): Proxy endpoint for Library of Congress lookups
-  (e.g., `https://your-proxy.example.com/loc-proxy`).
+  (e.g., `https://your-proxy.example.com/loc-isbn`; `.../loc-proxy` is also accepted).
 - `VITE_OL_PROXY_BASE` (optional): Proxy endpoint for Open Library lookups
-  (e.g., `https://your-proxy.example.com/ol-proxy`).
+  (e.g., `https://your-proxy.example.com/ol-isbn`; `.../ol-proxy` is also accepted).
 
 **KBART Columns**
 - `title_id`
@@ -60,7 +60,10 @@ The app runs at `http://localhost:5173`.
 - `source_id`
 - `source_id_type`
 - `vendor_id` (populated for DOI, CNRI Handle, UUID)
-- `isbn` (enriched via Library of Congress when enabled)
+- `isbn` (enriched via Open Library or Library of Congress when enabled)
+
+Library of Congress lookups are intentionally slower and rate-limited to align
+with LOC API guidance.
 
 MARC output supports:
 - `MARC21 (ISO 2709)` and `MARCXML` formats
@@ -83,6 +86,5 @@ at the proxy service URL, for example:
 - `VITE_OPDS_PROXY_BASE=https://palace-kbart-proxy.onrender.com/opds-proxy`
 - `VITE_WEB_PROXY_BASE=https://palace-kbart-proxy.onrender.com/web-proxy`
 - `VITE_REGISTRY_PROXY_BASE=https://palace-kbart-proxy.onrender.com/registry-proxy`
-- `VITE_LOC_PROXY_BASE=https://palace-kbart-proxy.onrender.com/loc-proxy`
-- `VITE_OL_PROXY_BASE=https://palace-kbart-proxy.onrender.com/ol-proxy`
-- `VITE_LOC_PROXY_BASE=https://palace-kbart-proxy.onrender.com/loc-proxy`
+- `VITE_LOC_PROXY_BASE=https://palace-kbart-proxy.onrender.com/loc-isbn`
+- `VITE_OL_PROXY_BASE=https://palace-kbart-proxy.onrender.com/ol-isbn`
