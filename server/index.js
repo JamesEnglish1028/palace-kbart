@@ -356,9 +356,9 @@ app.get("/loc-isbn", async (req, res) => {
       res.json({ isbn: "", rate_limited: true });
       return;
     }
-    res.status(searchResponse.status);
     const buffer = Buffer.from(await searchResponse.arrayBuffer());
     if (!searchResponse.ok) {
+      res.status(searchResponse.status);
       res.setHeader("content-type", "text/plain; charset=utf-8");
       res.end(buffer);
       return;
@@ -401,6 +401,7 @@ app.get("/loc-isbn", async (req, res) => {
     }
     const itemBuffer = Buffer.from(await itemResponse.arrayBuffer());
     if (!itemResponse.ok) {
+      res.status(itemResponse.status);
       res.setHeader("content-type", "text/plain; charset=utf-8");
       res.end(itemBuffer);
       return;

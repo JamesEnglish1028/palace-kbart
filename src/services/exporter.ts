@@ -167,7 +167,9 @@ const fetchLocIsbn = async (
         continue;
       }
       if (!finalResponse.ok) return "";
-      const payload = (await finalResponse.json()) as { isbn?: string };
+        const contentType = finalResponse.headers.get("content-type") || "";
+        if (!contentType.includes("json")) return "";
+        const payload = (await finalResponse.json()) as { isbn?: string };
       return payload?.isbn || "";
     }
     return "";
