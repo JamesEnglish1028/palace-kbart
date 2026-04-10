@@ -230,6 +230,13 @@ const stringToByteArray = (value: string) => {
 
 const lengthInUtf8Bytes = (value: string) => stringToByteArray(value).length;
 
+const ensureTrailing = (value: string, expected: string) => {
+  const trimmedEnd = value.replace(/\s+$/, "");
+  if (!trimmedEnd) return value;
+  if (trimmedEnd.endsWith(expected.trim())) return trimmedEnd;
+  return `${trimmedEnd}${expected}`;
+};
+
 const buildMarcRecord = (
   entry: ReturnType<typeof parseOpds2Feed>["items"][number],
   libraryShortName: string,
@@ -256,11 +263,12 @@ const buildMarcRecord = (
   const title = entry.title || "";
   const author = entry.authors && entry.authors !== "Unlisted" ? entry.authors : "";
   const titleInd1 = author ? "1" : "0";
+  const titleSubfieldA = author ? ensureTrailing(title, " /") : title;
   record.appendField({
     tag: "245",
     ind1: titleInd1,
     ind2: "0",
-    subfields: [{ code: "a", value: title }],
+    subfields: [{ code: "a", value: titleSubfieldA }],
   });
 
   if (author) {
@@ -286,8 +294,16 @@ const buildMarcRecord = (
   }
   if (publisher || published) {
     const subfields = [] as Array<{ code: string; value: string }>;
-    if (publisherPlace) subfields.push({ code: "a", value: publisherPlace });
-    if (publisher) subfields.push({ code: "b", value: publisher });
+    if (publisherPlace) {
+      const placeValue = publisher
+        ? ensureTrailing(publisherPlace, " :")
+        : publisherPlace;
+      subfields.push({ code: "a", value: placeValue });
+    }
+    if (publisher) {
+      const publisherValue = published ? ensureTrailing(publisher, ",") : publisher;
+      subfields.push({ code: "b", value: publisherValue });
+    }
     if (published) subfields.push({ code: "c", value: published });
     record.appendField({
       tag: "264",
@@ -327,8 +343,23 @@ const buildMarcRecord = (
   }
 
   if (isAudiobook) {
-    record.appendField({ tag: "007", value: "sr|||||" });
-    const fixed = Array(40).fill(" ");
+    const field006 = Array(18).fill("\\");
+    field006[0] = "m";
+    field006[9] = "h";
+    record.appendField({ tag: "006", value: field006.join("") });
+
+    const field007Computer = Array(14).fill("\\");
+    field007Computer[0] = "c";
+    field007Computer[5] = "a";
+    record.appendField({ tag: "007", value: field007Computer.join("") });
+
+    const field007Sound = Array(14).fill("\\");
+    field007Sound[0] = "s";
+    field007Sound[12] = "e";
+    field007Sound[13] = "d";
+    record.appendField({ tag: "007", value: field007Sound.join("") });
+
+    const fixed = Array(40).fill("\\");
     fixed[23] = "o";
     fixed[26] = "h";
     record.appendField({ tag: "008", value: fixed.join("") });
@@ -373,7 +404,7 @@ const buildMarcRecord = (
       ind1: " ",
       ind2: "7",
       subfields: [
-        { code: "a", value: "Audiobooks." },
+        { code: "a", value: "audiobooks" },
         { code: "2", value: "lcgft" },
       ],
     });
